@@ -24,7 +24,16 @@ jobs:
 
       - name: Apply single-file patch
         shell: pwsh
-        run: git -C src apply --whitespace=nowarn "${{ github.workspace }}/vive.patch"
+        run: |
+          $ErrorActionPreference = "Stop"
+          # Checkout on Windows rewrites the patch to CRLF, and git apply then rejects it.
+          $text = [System.IO.File]::ReadAllText("${{ github.workspace }}/vive.patch")
+          $text = $text -replace "`r`n", "`n" -replace "`r", "`n"
+          $normalized = Join-Path $env:RUNNER_TEMP "vive.lf.patch"
+          $utf8 = New-Object System.Text.UTF8Encoding $false
+          [System.IO.File]::WriteAllText($normalized, $text, $utf8)
+          git -C src apply --whitespace=nowarn $normalized
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build
         shell: pwsh
